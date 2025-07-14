@@ -20,8 +20,8 @@ pub fn build(b: *std.Build) void {
 
     const bgfx = b.dependency("zig_bgfx", .{
         .optimize = optimize,
-        .directx11 = false,
-        .directx12 = false,
+        // .directx11 = false,
+        // .directx12 = false,
     });
 
     exe.linkLibrary(bgfx.artifact("bgfx"));

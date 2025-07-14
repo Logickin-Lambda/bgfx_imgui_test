@@ -70,7 +70,7 @@ pub fn main() !void {
     c.bgfx_set_view_clear(
         0,
         c.BGFX_CLEAR_COLOR | c.BGFX_CLEAR_DEPTH,
-        0x303030,
+        0x303030ff,
         1,
         0,
     );
@@ -83,7 +83,11 @@ pub fn main() !void {
 
         c.bgfx_set_view_rect(0, 0, 0, window_config.width, window_config.height);
 
-        // For some reasons, Directx 3D 11 doesn't show the debug text, but
+        // Similar to the original example, it turns out we need to use a hacky way to draw any non-shader objects;
+        // otherwise, we will only have a blank black screen.
+        c.bgfx_touch(0);
+
+        // For some reasons, Directx 3D 11 doesn't show the debug text if we don't call bgfx_touch(0), but
         // Using Directx 3D 12,and Vulkan works perfectly fine.
         c.bgfx_dbg_text_clear(0, false);
         c.bgfx_dbg_text_printf(1, 1, 0xf, "<!-- %s -->", "Skri-A Kaark");
