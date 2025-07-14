@@ -4,6 +4,7 @@
 const std = @import("std");
 const zm = @import("zm");
 const builtin = @import("builtin");
+const logo = @import("logo.zig");
 const c = @cImport({
     @cDefine("SDL_DISABLE_OLD_NAMES", {});
     @cInclude("SDL3/SDL.h");
@@ -20,7 +21,7 @@ const WindowConfig = struct {
 
 pub fn main() !void {
     // initialize SDL:
-    const window_config = WindowConfig{ .width = 800, .height = 600 };
+    const window_config = WindowConfig{ .width = 1280, .height = 720 };
 
     if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
         @panic("SDL Initialization Failed");
@@ -83,14 +84,49 @@ pub fn main() !void {
 
         c.bgfx_set_view_rect(0, 0, 0, window_config.width, window_config.height);
 
+        // clear debug font
+        c.bgfx_dbg_text_clear(0, false);
+
         // Similar to the original example, it turns out we need to use a hacky way to draw any non-shader objects;
         // otherwise, we will only have a blank black screen.
         c.bgfx_touch(0);
 
+        const stats: *c.bgfx_stats_t = @constCast(c.bgfx_get_stats());
+
+        // since the original has stated that bx::max<uint16_t>(uint16_t(stats->textWidth/2), 20)-20
+        // meaning that if half of text width is larger, return textWisdth - 20; otherwise 0 because
+        // both 20 has cancelled out. Besides, doing integer division in zig is a bit noisy due to the use
+        // of @divFloor(), while this just a simple divide by 2, thus a right shift.
+        const img_x = std.math.clamp(stats.textWidth >> 1, 20, std.math.maxInt(u16)) - 20;
+        const img_y = std.math.clamp(stats.textHeight >> 1, 6, std.math.maxInt(u16)) - 6;
+
+        std.log.info("img_x: {d}, img_y: {d}", .{ img_x, img_y });
+
+        c.bgfx_dbg_text_image(
+            img_x,
+            img_y,
+            40,
+            12,
+            &logo.s_logo,
+            160,
+        );
+
         // For some reasons, Directx 3D 11 doesn't show the debug text if we don't call bgfx_touch(0), but
         // Using Directx 3D 12,and Vulkan works perfectly fine.
-        c.bgfx_dbg_text_clear(0, false);
-        c.bgfx_dbg_text_printf(1, 1, 0xf, "<!-- %s -->", "Skri-A Kaark");
+        c.bgfx_dbg_text_printf(0, 1, 0x0f, "Color can be changed with ANSI \x1b[9;me\x1b[10;ms\x1b[11;mc\x1b[12;ma\x1b[13;mp\x1b[14;me\x1b[0m code too.");
+        c.bgfx_dbg_text_printf(80, 1, 0x0f, "\x1b[;0m    \x1b[;1m    \x1b[; 2m    \x1b[; 3m    \x1b[; 4m    \x1b[; 5m    \x1b[; 6m    \x1b[; 7m    \x1b[0m");
+        c.bgfx_dbg_text_printf(80, 2, 0x0f, "\x1b[;8m    \x1b[;9m    \x1b[;10m    \x1b[;11m    \x1b[;12m    \x1b[;13m    \x1b[;14m    \x1b[;15m    \x1b[0m");
+
+        c.bgfx_dbg_text_printf(
+            0,
+            2,
+            0x0f,
+            "Backbuffer %dW x %dH in pixels, debug text %dW x %dH in characters.",
+            stats.width,
+            stats.height,
+            stats.textWidth,
+            stats.textHeight,
+        );
 
         _ = c.bgfx_frame(false);
     }
