@@ -48,6 +48,10 @@
             .url = "git+https://github.com/castholm/SDL.git#3ed62e53aecd9ffb28e44b9d35b7c09a8739e823",
             .hash = "sdl-0.2.4+3.2.16-7uIn9DPhfgH29yAIJqHLc69hNb4IW0q-AngtKCFoT92b",
         },
+        .zgui = .{
+            .url = "git+https://github.com/zig-gamedev/zgui#b2f29f14bce688ec90a26a9a7906543d98e0f8a0",
+            .hash = "zgui-0.6.0-dev--L6sZBDaaAAs88V6Y7ALQ_OU1KHG88hUYlKlrJdMEGsD",
+        },
     },
 
     // Specifies the set of files and directories that are included in this package.

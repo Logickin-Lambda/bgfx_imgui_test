@@ -4,15 +4,20 @@
 const std = @import("std");
 const zm = @import("zm");
 const builtin = @import("builtin");
+const zgui = @import("zgui");
 const logo = @import("logo.zig");
 const c = @cImport({
     @cDefine("SDL_DISABLE_OLD_NAMES", {});
     @cInclude("SDL3/SDL.h");
     @cInclude("SDL3/SDL_revision.h");
+    @cInclude("SDL3/SDL_gpu.h");
     @cDefine("SDL_MAIN_HANDLED", {}); // We are providing our own entry point
     @cInclude("SDL3/SDL_main.h");
     @cInclude("bgfx/c99/bgfx.h");
+    @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", {});
 });
+
+const MAIN_FONT = @embedFile("Roboto-Medium.ttf");
 
 const WindowConfig = struct {
     width: comptime_int,
@@ -61,10 +66,6 @@ pub fn main() !void {
     }
     defer c.bgfx_shutdown();
 
-    const renderer_type = c.bgfx_get_renderer_type();
-    const backend_name = c.bgfx_get_renderer_name(renderer_type);
-    std.debug.print("Using Backend: {s}\n", .{backend_name});
-
     // enable debug text
     c.bgfx_set_debug(c.BGFX_DEBUG_TEXT);
 
@@ -76,12 +77,61 @@ pub fn main() !void {
         0,
     );
 
+    // we can extract the name of the backend for debugging.
+    // Initially, similar to OpenGL, they only return the id of the renderer.
+    const renderer_type = c.bgfx_get_renderer_type();
+    const backend_name = c.bgfx_get_renderer_name(renderer_type);
+    std.debug.print("Using Backend: {s}\n", .{backend_name});
+
+    // since we are using zgui which has imgui included,
+    // the initialization process is different
+    // Reference: https://github.com/zig-gamedev/zgui?tab=readme-ov-file#getting-started
+    const smp = std.heap.smp_allocator;
+    zgui.init(smp);
+    defer zgui.deinit();
+
+    var main_config = zgui.FontConfig.init();
+    main_config.font_data_owned_by_atlas = false;
+    _ = zgui.io.addFontFromMemoryWithConfig(MAIN_FONT, 16, main_config, null);
+
+    const sdl_gpu_device = c.SDL_CreateGPUDevice(c.SDL_GPU_SHADERFORMAT_SPIRV, true, "vulkan") orelse {
+        @panic("Cannot Create SDL_GPU_DEVICE");
+    };
+
+    const imgui_init_info = zgui.backend.ImGui_ImplSDLGPU3_InitInfo{
+        .device = sdl_gpu_device,
+        .color_target_format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UINT,
+        .msaa_samples = 1,
+    };
+
+    std.debug.print("Initializing Imgui Backend...\n", .{});
+
+    zgui.backend.init(window, imgui_init_info);
+    defer zgui.backend.deinit();
+
     // Main Event Loop:
     var running = true;
 
     while (running) {
         pollEvents(&running);
 
+        // imgui components
+        std.debug.print("Loading Imgui Components...\n", .{});
+
+        zgui.backend.newFrame(window_config.width, window_config.height, 1); // SDL has Scale parameter
+
+        zgui.setNextWindowPos(.{ .x = 20, .y = 20, .cond = .first_use_ever });
+        zgui.setNextWindowSize(.{ .w = -1, .h = -1, .cond = .first_use_ever });
+
+        if (zgui.begin("My window", .{})) {
+            if (zgui.button("Press me!", .{ .w = 200 })) {
+                std.debug.print("Button pressed\n", .{});
+            }
+        }
+        zgui.end();
+        zgui.endFrame();
+
+        // bgfx components
         c.bgfx_set_view_rect(0, 0, 0, window_config.width, window_config.height);
 
         // clear debug font
@@ -99,8 +149,6 @@ pub fn main() !void {
         // of @divFloor(), while this just a simple divide by 2, thus a right shift.
         const img_x = std.math.clamp(stats.textWidth >> 1, 20, std.math.maxInt(u16)) - 20;
         const img_y = std.math.clamp(stats.textHeight >> 1, 6, std.math.maxInt(u16)) - 6;
-
-        std.log.info("img_x: {d}, img_y: {d}", .{ img_x, img_y });
 
         c.bgfx_dbg_text_image(
             img_x,

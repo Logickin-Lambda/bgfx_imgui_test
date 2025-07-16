@@ -1,4 +1,5 @@
 const std = @import("std");
+const cimgui_imp = @import("cimgui_zig");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -18,10 +19,12 @@ pub fn build(b: *std.Build) void {
         .root_module = exe_mod,
     });
 
+    // Because of the limitation of the cimgui, I have to limit
+    // my build to vulkan only.
     const bgfx = b.dependency("zig_bgfx", .{
         .optimize = optimize,
-        // .directx11 = false,
-        // .directx12 = false,
+        .directx11 = false,
+        .directx12 = false,
     });
 
     exe.linkLibrary(bgfx.artifact("bgfx"));
@@ -38,6 +41,15 @@ pub fn build(b: *std.Build) void {
     });
     const sdl_lib = sdl_dep.artifact("SDL3");
     exe_mod.linkLibrary(sdl_lib);
+
+    // The main objective of this project, loading imgui
+    const zgui = b.dependency("zgui", .{
+        .shared = false,
+        .optimize = optimize,
+        .backend = .sdl3_gpu,
+    });
+    exe_mod.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
 
     b.installArtifact(exe);
 
